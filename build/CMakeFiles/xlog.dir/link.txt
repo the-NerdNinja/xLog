@@ -1,0 +1,1 @@
+/usr/sbin/c++ -Wl,--dependency-file=CMakeFiles/xlog.dir/link.d CMakeFiles/xlog.dir/src/main.cpp.o -o xlog  /usr/lib/libsqlite3.so

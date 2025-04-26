@@ -1,0 +1,3 @@
+/mnt/c/Users/IUT_220041109/OneDrive/Desktop/xLog/build/CMakeFiles/xlog.dir
+/mnt/c/Users/IUT_220041109/OneDrive/Desktop/xLog/build/CMakeFiles/edit_cache.dir
+/mnt/c/Users/IUT_220041109/OneDrive/Desktop/xLog/build/CMakeFiles/rebuild_cache.dir
