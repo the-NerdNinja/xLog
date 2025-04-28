@@ -45,9 +45,6 @@ void init_db() {
     " xp INTEGER NOT NULL DEFAULT 0,"
     " UNIQUE(domain_id, name));"
 
-    "CREATE UNIQUE INDEX IF NOT EXISTS one_focus_per_domain "
-    "ON elements(domain_id) WHERE is_focus = 1;"
-
     "CREATE TABLE IF NOT EXISTS tasks ("
     " id INTEGER PRIMARY KEY AUTOINCREMENT,"
     " name TEXT NOT NULL UNIQUE,"
@@ -266,10 +263,9 @@ void complete_task_by_id(int tid) {
 
   double maj_xp=base_maj, min_xp=base_min;
   sqlite3_prepare_v2(db,
-    "SELECT is_focus FROM elements WHERE id=(SELECT domain_id FROM elements WHERE id=?)",
-    -1,&stmt,nullptr);
-  sqlite3_bind_int(stmt,1,maj);
-  bool focus = sqlite3_step(stmt)==SQLITE_ROW && sqlite3_column_int(stmt,0)==1;
+  "SELECT is_focus FROM elements WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, maj);
+  bool focus = (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) == 1);
   sqlite3_finalize(stmt);
   if(focus){ maj_xp*=1.1; min_xp*=1.1; }
 
@@ -311,6 +307,49 @@ void complete_task() {
   complete_task_by_id(tid);
   cout<<"Task completed!\n"; cin.get();
 }
+
+void make_focus() {
+  clear_screen();
+  cout << "-- Make Focus Element --\n";
+  cout << "Element name: ";
+  string elem_name;
+  getline(cin, elem_name);
+
+  int eid = get_element_id_by_name(elem_name);
+  if (eid < 0) {
+    cout << "Element not found.\n"; cin.get(); return;
+  }
+
+  // Find domain_id of this element
+  sqlite3_stmt* stmt;
+  int dom_id = -1;
+  sqlite3_prepare_v2(db, "SELECT domain_id FROM elements WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, eid);
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    dom_id = sqlite3_column_int(stmt, 0);
+  }
+  sqlite3_finalize(stmt);
+
+  if (dom_id == -1) {
+    cout << "Domain not found.\n"; cin.get(); return;
+  }
+
+  // Unset previous focus in this domain
+  sqlite3_prepare_v2(db, "UPDATE elements SET is_focus = 0 WHERE domain_id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, dom_id);
+  sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+
+  // Set this element as focus
+  sqlite3_prepare_v2(db, "UPDATE elements SET is_focus = 1 WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, eid);
+  sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+
+  cout << "Focus updated successfully.\n";
+  cin.get();
+}
+
 
 // --- Daily log ----------------------------------------------------------
 void log_today_xp() {
@@ -469,18 +508,19 @@ void view_domain() {
     return;
   }
 
-  struct Elem { std::string name; double xp; };
+  struct Elem { std::string name; double xp; bool is_focus; };
   std::vector<Elem> elems;
   double sum_xp = 0.0, xp_max = 109500.0;
 
   sqlite3_prepare_v2(db,
-    "SELECT name, xp FROM elements WHERE domain_id = ?",
+    "SELECT name, xp, is_focus FROM elements WHERE domain_id = ?",
     -1, &stmt, nullptr);
   sqlite3_bind_int(stmt, 1, dom_id);
   while (sqlite3_step(stmt) == SQLITE_ROW) {
     Elem e;
     e.name = (const char*)sqlite3_column_text(stmt, 0);
-    e.xp   = sqlite3_column_double(stmt, 1);
+    e.xp = sqlite3_column_double(stmt, 1);
+    e.is_focus = sqlite3_column_int(stmt, 2) == 1;
     sum_xp += e.xp;
     elems.push_back(e);
   }
@@ -516,36 +556,40 @@ void view_domain() {
     int lvl = std::min(8,
       std::max(0, int(std::sqrt(e.xp / xp_max) * 8.0))
     );
-    std::cout
-      << colors[lvl] << "\033[1m"
-      << std::left << std::setw(12) << e.name
-      << "\033[0m"
-      << colors[lvl]
+    std::cout << colors[lvl] << "\033[1m";
+    if (e.is_focus)
+      std::cout << "\033[4m"; // underline
+    std::cout << std::left << std::setw(12) << e.name << "\033[0m";
+    std::cout << colors[lvl]
       << " : " << std::fixed << std::setprecision(2) << e.xp
       << "\033[0m\n";
   }
 
   std::cin.get();
 }
+
 // --- Menu ---------------------------------------------------------------
+
 void menu() {
-  while(true) {
+  while (true) {
     clear_screen();
-    cout<<"== Main Menu ==\n"
-        <<"1. Add Task\n"
-        <<"2. Delete Task\n"
-        <<"3. View Today's Tasks\n"
-        <<"4. Complete Task\n"
-        <<"5. View Profile\n"
-        <<"6. View Domain Details\n"
-        <<"0. Exit\n> ";
-    int ch; cin>>ch; cin.ignore();
-    if(ch==1) add_task();
-    else if(ch==2) delete_task();
-    else if(ch==3) view_todays_tasks();
-    else if(ch==4) complete_task();
-    else if(ch==5) view_profile();
-    else if(ch==6) view_domain();
+    cout << "== Main Menu ==\n"
+         << "1. Add Task\n"
+         << "2. Delete Task\n"
+         << "3. View Today's Tasks\n"
+         << "4. Complete Task\n"
+         << "5. View Profile\n"
+         << "6. View Domain Details\n"
+         << "7. Make Focus Element\n"
+         << "0. Exit\n> ";
+    int ch; cin >> ch; cin.ignore();
+    if (ch == 1) add_task();
+    else if (ch == 2) delete_task();
+    else if (ch == 3) view_todays_tasks();
+    else if (ch == 4) complete_task();
+    else if (ch == 5) view_profile();
+    else if (ch == 6) view_domain();
+    else if (ch == 7) make_focus();
     else break;
   }
 }
