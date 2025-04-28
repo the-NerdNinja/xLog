@@ -5,31 +5,31 @@ using namespace std;
 static sqlite3* db;
 
 void clear_screen() {
-  std::system("clear");
+  system("clear");
 }
 
-std::string now_str() {
+string now_str() {
   time_t t = time(nullptr);
   char buf[20];
   strftime(buf, sizeof(buf), "%Y-%m-%d", localtime(&t));
-  return std::string(buf);
+  return string(buf);
 }
 
 void check(int rc, char* err) {
   if (rc != SQLITE_OK) {
-    std::cerr << "SQL error: " << (err ? err : "unknown") << std::endl;
+    cerr << "SQL error: " << (err ? err : "unknown") << endl;
     sqlite3_free(err);
     exit(1);
   }
 }
 
+// --- DB initialization --------------------------------------------------
 void init_db() {
   char* err = nullptr;
   const char* sql =
     "PRAGMA foreign_keys = ON;"
-
     "CREATE TABLE IF NOT EXISTS user ("
-    " id INTEGER PRIMARY KEY CHECK (id = 1),"
+    " id INTEGER PRIMARY KEY CHECK(id=1),"
     " name TEXT NOT NULL,"
     " created_at TEXT NOT NULL);"
 
@@ -43,7 +43,7 @@ void init_db() {
     " name TEXT NOT NULL,"
     " is_focus INTEGER NOT NULL DEFAULT 0,"
     " xp INTEGER NOT NULL DEFAULT 0,"
-    " UNIQUE(domain_id,name));"
+    " UNIQUE(domain_id, name));"
 
     "CREATE UNIQUE INDEX IF NOT EXISTS one_focus_per_domain "
     "ON elements(domain_id) WHERE is_focus = 1;"
@@ -56,81 +56,283 @@ void init_db() {
     " major_elem INTEGER NOT NULL REFERENCES elements(id),"
     " minor_elem INTEGER NOT NULL REFERENCES elements(id),"
     " last_done TEXT,"
-    " streak INTEGER NOT NULL DEFAULT 0);";
+    " streak INTEGER NOT NULL DEFAULT 0,"
+    " active INTEGER NOT NULL DEFAULT 1);"
+
+    "CREATE TABLE IF NOT EXISTS xp_log ("
+    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    " date TEXT NOT NULL UNIQUE,"
+    " profile_xp REAL NOT NULL,"
+    " domain1_xp REAL NOT NULL,"
+    " domain2_xp REAL NOT NULL,"
+    " domain3_xp REAL NOT NULL,"
+    " domain4_xp REAL NOT NULL);";
 
   int rc = sqlite3_exec(db, sql, nullptr, nullptr, &err);
   check(rc, err);
 }
 
-int get_domain_id_by_name(const std::string& name) {
+// --- Helpers ------------------------------------------------------------
+int get_int(const string& q) {
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, q.c_str(), -1, &stmt, nullptr);
+  int val = -1;
+  if (sqlite3_step(stmt) == SQLITE_ROW) val = sqlite3_column_int(stmt, 0);
+  sqlite3_finalize(stmt);
+  return val;
+}
+
+double get_double(const string& q) {
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, q.c_str(), -1, &stmt, nullptr);
+  double val = 0;
+  if (sqlite3_step(stmt) == SQLITE_ROW) val = sqlite3_column_double(stmt, 0);
+  sqlite3_finalize(stmt);
+  return val;
+}
+
+int get_domain_id_by_name(const string& name) {
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "SELECT id FROM domains WHERE name = ?", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(stmt,1,name.c_str(),-1,SQLITE_TRANSIENT);
   int id = -1;
   if (sqlite3_step(stmt) == SQLITE_ROW) id = sqlite3_column_int(stmt, 0);
   sqlite3_finalize(stmt);
   return id;
 }
 
-int get_element_id_by_name(const std::string& name) {
+int get_element_id_by_name(const string& name) {
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "SELECT id FROM elements WHERE name = ?", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(stmt,1,name.c_str(),-1,SQLITE_TRANSIENT);
   int id = -1;
   if (sqlite3_step(stmt) == SQLITE_ROW) id = sqlite3_column_int(stmt, 0);
   sqlite3_finalize(stmt);
   return id;
 }
 
-int get_task_id_by_name(const std::string& name) {
+int get_task_id_by_name(const string& name) {
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "SELECT id FROM tasks WHERE name = ?", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(stmt,1,name.c_str(),-1,SQLITE_TRANSIENT);
   int id = -1;
   if (sqlite3_step(stmt) == SQLITE_ROW) id = sqlite3_column_int(stmt, 0);
   sqlite3_finalize(stmt);
   return id;
 }
 
-int count_rows(const std::string& tbl) {
+string get_task_last_done(int tid) {
   sqlite3_stmt* stmt;
-  int count = 0;
-  std::string q = "SELECT COUNT(*) FROM " + tbl;
-  sqlite3_prepare_v2(db, q.c_str(), -1, &stmt, nullptr);
-  if (sqlite3_step(stmt) == SQLITE_ROW) {
-    count = sqlite3_column_int(stmt, 0);
-  }
+  sqlite3_prepare_v2(db, "SELECT last_done FROM tasks WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt,1,tid);
+  string s;
+  if (sqlite3_step(stmt)==SQLITE_ROW && sqlite3_column_text(stmt,0))
+    s = (const char*)sqlite3_column_text(stmt,0);
   sqlite3_finalize(stmt);
-  return count;
+  return s;
 }
 
-void prompt_initial_setup() {
-  clear_screen();
-  std::cout << "-- xLog : Initial Setup --\n";
-
-  std::cout << "Enter your name: ";
-  std::string user_name;
-  std::getline(std::cin, user_name);
-
+vector<double> fetch_domain_xps() {
+  vector<double> v(4);
   sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO user(id, name, created_at) VALUES(1, ?, ?)", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, user_name.c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt, 2, now_str().c_str(), -1, SQLITE_TRANSIENT);
+  sqlite3_prepare_v2(db, "SELECT id FROM domains ORDER BY id LIMIT 4", -1, &stmt, nullptr);
+  int i=0;
+  while (sqlite3_step(stmt)==SQLITE_ROW && i<4) {
+    int did = sqlite3_column_int(stmt,0);
+    v[i++] = get_double("SELECT COALESCE(SUM(xp),0) FROM elements WHERE domain_id = " + to_string(did));
+  }
+  sqlite3_finalize(stmt);
+  return v;
+}
+
+void insert_xp_log(const vector<double>& dx, double px) {
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db,
+    "INSERT INTO xp_log(date,profile_xp,domain1_xp,domain2_xp,domain3_xp,domain4_xp)"
+    " VALUES(?,?,?,?,?,?)", -1, &stmt, nullptr);
+  sqlite3_bind_text(stmt,1,now_str().c_str(),-1,SQLITE_TRANSIENT);
+  sqlite3_bind_double(stmt,2,px);
+  for (int i=0;i<4;i++) sqlite3_bind_double(stmt,3+i,dx[i]);
   sqlite3_step(stmt);
   sqlite3_finalize(stmt);
+}
 
+// --- Initial setup ------------------------------------------------------
+void prompt_initial_setup() {
   clear_screen();
-  std::cout << "-- Create 5 domains --\n";
-  std::string name;
-  for (int i = 0; i < 5; ++i) {
-    std::cout << "Enter name for domain #" << i+1 << ": ";
-    std::getline(std::cin, name);
+  cout<<"-- xLog : Initial Setup --\n";
+  cout<<"Enter your name: ";
+  string uname; getline(cin,uname);
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, "INSERT INTO user(id,name,created_at) VALUES(1,?,?)", -1, &stmt, nullptr);
+  sqlite3_bind_text(stmt,1,uname.c_str(),-1,SQLITE_TRANSIENT);
+  sqlite3_bind_text(stmt,2,now_str().c_str(),-1,SQLITE_TRANSIENT);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
+
+  clear_screen(); cout<<"-- Create 4 domains & elements --\n";
+  for (int d=0; d<4; ++d) {
+    cout<<"Domain #"<<d+1<<" name: ";
+    string dn; getline(cin,dn);
     sqlite3_prepare_v2(db, "INSERT INTO domains(name) VALUES(?)", -1, &stmt, nullptr);
-    sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_step(stmt);
+    sqlite3_bind_text(stmt,1,dn.c_str(),-1,SQLITE_TRANSIENT);
+    sqlite3_step(stmt); sqlite3_finalize(stmt);
+    int did = get_domain_id_by_name(dn);
+    for (int e=0; e<4; ++e) {
+      cout<<"  Element #"<<e+1<<" for '"<<dn<<"': ";
+      string en; getline(cin,en);
+      sqlite3_prepare_v2(db,
+        "INSERT INTO elements(domain_id,name) VALUES(?,?)", -1, &stmt, nullptr);
+      sqlite3_bind_int(stmt,1,did);
+      sqlite3_bind_text(stmt,2,en.c_str(),-1,SQLITE_TRANSIENT);
+      sqlite3_step(stmt); sqlite3_finalize(stmt);
+    }
+  }
+
+  int did_elem = get_element_id_by_name("discipline");
+  sqlite3_prepare_v2(db,
+    "INSERT INTO tasks(name,type,frequency,major_elem,minor_elem) VALUES('daily_login','Session',1,?,?)",
+    -1,&stmt,nullptr);
+  sqlite3_bind_int(stmt,1,did_elem);
+  sqlite3_bind_int(stmt,2,did_elem);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
+}
+
+// --- Task operations ----------------------------------------------------
+void add_task() {
+  clear_screen(); cout<<"-- Add Task --\n";
+  cout<<"Task name: "; string name; getline(cin,name);
+  cout<<"Type (Quick/Session/Grind): "; string type; getline(cin,type);
+  cout<<"Frequency (days, 0=one-time): "; int freq; cin>>freq; cin.ignore();
+  cout<<"Major element name: "; string maj; getline(cin,maj);
+  cout<<"Minor element name: "; string minor_elem_name; getline(cin,minor_elem_name);
+  int mi=get_element_id_by_name(maj), mn=get_element_id_by_name(minor_elem_name);
+  if(mi<0||mn<0){ cout<<"Element not found.\n"; cin.get(); return;}  
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db,
+    "INSERT INTO tasks(name,type,frequency,major_elem,minor_elem)"
+    " VALUES(?,?,?,?,?)", -1, &stmt, nullptr);
+  sqlite3_bind_text(stmt,1,name.c_str(),-1,SQLITE_TRANSIENT);
+  sqlite3_bind_text(stmt,2,type.c_str(),-1,SQLITE_TRANSIENT);
+  sqlite3_bind_int(stmt,3,freq);
+  sqlite3_bind_int(stmt,4,mi);
+  sqlite3_bind_int(stmt,5,mn);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
+}
+
+void delete_task() {
+  clear_screen(); cout<<"-- Delete Task --\n";
+  cout<<"Task name: "; string name; getline(cin,name);
+  int tid=get_task_id_by_name(name);
+  if(tid<0){ cout<<"Not found.\n"; cin.get(); return; }
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, "DELETE FROM tasks WHERE id=?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt,1,tid);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
+  cout<<"Deleted.\n"; cin.get();
+}
+
+void view_todays_tasks() {
+  clear_screen(); cout<<"-- Today's Tasks --\n";
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db,
+    "SELECT name,type FROM tasks WHERE active=1 AND "
+    "(last_done IS NULL OR (frequency>0 AND date('now','localtime')>=date(last_done,'+'||frequency||' days')))"
+    , -1, &stmt, nullptr);
+  while(sqlite3_step(stmt)==SQLITE_ROW)
+    cout<<"- "<<(const char*)sqlite3_column_text(stmt,0)
+        <<" ("<<(const char*)sqlite3_column_text(stmt,1)<<")\n";
+  sqlite3_finalize(stmt);
+  cin.get();
+}
+
+void complete_task_by_id(int tid) {
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db,
+    "SELECT type,major_elem,minor_elem,streak,frequency,last_done"
+    " FROM tasks WHERE id=?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt,1,tid); sqlite3_step(stmt);
+  string type=(char*)sqlite3_column_text(stmt,0);
+  int maj=sqlite3_column_int(stmt,1);
+  int minr=sqlite3_column_int(stmt,2);
+  int streak=sqlite3_column_int(stmt,3);
+  int freq=sqlite3_column_int(stmt,4);
+  string last = (char*)sqlite3_column_text(stmt,5) ?: string();
+  sqlite3_finalize(stmt);
+
+  int base_maj=0, base_min=0;
+  if(type=="Quick"){ base_maj=10;base_min=5;} 
+  else if(type=="Session"){ base_maj=60;base_min=30;} 
+  else if(type=="Grind"){ base_maj=125;base_min=75;}
+
+  double maj_xp=base_maj, min_xp=base_min;
+  sqlite3_prepare_v2(db,
+    "SELECT is_focus FROM elements WHERE id=(SELECT domain_id FROM elements WHERE id=?)",
+    -1,&stmt,nullptr);
+  sqlite3_bind_int(stmt,1,maj);
+  bool focus = sqlite3_step(stmt)==SQLITE_ROW && sqlite3_column_int(stmt,0)==1;
+  sqlite3_finalize(stmt);
+  if(focus){ maj_xp*=1.1; min_xp*=1.1; }
+
+  int pct=std::min(streak,20);
+  maj_xp*=(1+pct/100.0); min_xp*=(1+pct/100.0);
+
+  if(!last.empty()&&freq>0) {
+    sqlite3_prepare_v2(db,
+      "SELECT date(?, '+'||?||' days')", -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt,1,last.c_str(),-1,SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt,2,freq);
+    if(sqlite3_step(stmt)==SQLITE_ROW) {
+      string due=(char*)sqlite3_column_text(stmt,0);
+      if(now_str()>due) { maj_xp*=0.6; min_xp*=0.6; }
+    }
     sqlite3_finalize(stmt);
   }
+
+  int imaj=int(round(maj_xp)), imin=int(round(min_xp));
+  sqlite3_prepare_v2(db, "UPDATE elements SET xp=xp+? WHERE id=?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt,1,imaj); sqlite3_bind_int(stmt,2,maj);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
+  sqlite3_prepare_v2(db, "UPDATE elements SET xp=xp+? WHERE id=?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt,1,imin); sqlite3_bind_int(stmt,2,minr);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
+
+  sqlite3_prepare_v2(db,
+    "UPDATE tasks SET last_done=?,streak=streak+1 WHERE id=?", -1, &stmt, nullptr);
+  sqlite3_bind_text(stmt,1,now_str().c_str(),-1,SQLITE_TRANSIENT);
+  sqlite3_bind_int(stmt,2,tid);
+  sqlite3_step(stmt); sqlite3_finalize(stmt);
 }
+
+void complete_task() {
+  clear_screen(); cout<<"-- Complete Task --\n";
+  cout<<"Task name: "; string name; getline(cin,name);
+  int tid=get_task_id_by_name(name);
+  if(tid<0){ cout<<"Not found.\n";cin.get();return; }
+  complete_task_by_id(tid);
+  cout<<"Task completed!\n"; cin.get();
+}
+
+// --- Daily log ----------------------------------------------------------
+void log_today_xp() {
+  string today = now_str();
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, "SELECT 1 FROM xp_log WHERE date = ?", -1, &stmt, nullptr);
+  sqlite3_bind_text(stmt,1,today.c_str(),-1,SQLITE_TRANSIENT);
+  if(sqlite3_step(stmt)==SQLITE_ROW){ sqlite3_finalize(stmt); return; }
+  sqlite3_finalize(stmt);
+
+  int dlt = get_task_id_by_name("daily_login");
+  if(dlt>=0) complete_task_by_id(dlt);
+
+  auto dx = fetch_domain_xps();
+  double prod=1;
+  const double xp_max=109500.0;
+  for(double x:dx) prod*=x;
+  double px = pow(prod,1.0/4);
+  insert_xp_log(dx,px);
+}
+
+// --- Profile & domain view ---------------------------------------------
 void view_profile() {
   clear_screen();
   std::cout << "-- Profile Details --\n\n";
@@ -154,14 +356,14 @@ void view_profile() {
   const double xp_max = 109500.0;
 
   // --- 1) Load and sum each domain's XP from elements.xp ---
-  double domain_xps[5] = {0};
+  double domain_xps[4] = {0};
   sqlite3_stmt* stmt_dom;
   sqlite3_prepare_v2(db,
     "SELECT id, name FROM domains ORDER BY id",
     -1, &stmt_dom, nullptr);
 
   int idx = 0;
-  while (sqlite3_step(stmt_dom) == SQLITE_ROW && idx < 5) {
+  while (sqlite3_step(stmt_dom) == SQLITE_ROW && idx < 4) {
     int dom_id = sqlite3_column_int(stmt_dom, 0);
 
     // sum xp for this domain
@@ -180,8 +382,8 @@ void view_profile() {
 
   // --- 2) Compute profile XP (geometric mean) ---
   double product = 1;
-  for (int i = 0; i < 5; ++i) product *= domain_xps[i];
-  double profile_xp = pow(product, 1.0/5);
+  for (int i = 0; i < 4; ++i) product *= domain_xps[i];
+  double profile_xp = pow(product, 1.0/4);
 
   // --- 3) Determine profile level ---
   int profile_level = std::min(8,
@@ -217,7 +419,7 @@ void view_profile() {
   // --- 5) List each domain, color & align ---
   sqlite3_prepare_v2(db, "SELECT name FROM domains ORDER BY id", -1, &stmt_dom, nullptr);
   idx = 0;
-  while (sqlite3_step(stmt_dom) == SQLITE_ROW && idx < 5) {
+  while (sqlite3_step(stmt_dom) == SQLITE_ROW && idx < 4) {
     std::string name = (const char*)sqlite3_column_text(stmt_dom, 0);
     double xp = domain_xps[idx++];
     int dom_level = std::min(8,
@@ -234,143 +436,6 @@ void view_profile() {
   }
   sqlite3_finalize(stmt_dom);
 
-  std::cin.get();
-}
-
-void add_element() {
-  clear_screen();
-  std::cout << "-- Add Element --\n";
-  std::string domain_name;
-  std::cout << "Domain name: ";
-  std::getline(std::cin, domain_name);
-  int domain_id = get_domain_id_by_name(domain_name);
-  if (domain_id == -1) { std::cout << "Domain not found.\n"; std::cin.get(); return; }
-
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM elements WHERE domain_id = ?", -1, &stmt, nullptr);
-  sqlite3_bind_int(stmt,1,domain_id);
-  sqlite3_step(stmt);
-  int cnt = sqlite3_column_int(stmt,0);
-  sqlite3_finalize(stmt);
-  if (cnt >= 4) {
-    std::cout << "Domain already has 4 elements.\n";
-    std::cin.get(); return;
-  }
-
-  std::string name;
-  std::cout << "Element name: "; std::getline(std::cin,name);
-  sqlite3_prepare_v2(db, "INSERT INTO elements(domain_id,name) VALUES(?,?)", -1, &stmt, nullptr);
-  sqlite3_bind_int(stmt,1,domain_id);
-  sqlite3_bind_text(stmt,2,name.c_str(),-1,SQLITE_TRANSIENT);
-  sqlite3_step(stmt);
-  sqlite3_finalize(stmt);
-}
-
-void add_task() {
-  clear_screen();
-  std::cout << "-- Add Task --\n";
-  std::string name, type, maj_name, min_name;
-  int freq;
-  std::cout << "Task name: "; std::getline(std::cin,name);
-  std::cout << "Type (Quick/Session/Grind): "; std::getline(std::cin,type);
-  std::cout << "Frequency (days, 0=one-time): "; std::cin >> freq;
-  std::cin.ignore();
-  std::cout << "Major element name: "; std::getline(std::cin,maj_name);
-  std::cout << "Minor element name: "; std::getline(std::cin,min_name);
-  int maj = get_element_id_by_name(maj_name);
-  int min = get_element_id_by_name(min_name);
-  if (maj == -1 || min == -1) { std::cout << "Element(s) not found.\n"; std::cin.get(); return; }
-
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO tasks(name,type,frequency,major_elem,minor_elem) VALUES(?,?,?,?,?)", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt,1,name.c_str(),-1,SQLITE_TRANSIENT);
-  sqlite3_bind_text(stmt,2,type.c_str(),-1,SQLITE_TRANSIENT);
-  sqlite3_bind_int(stmt,3,freq);
-  sqlite3_bind_int(stmt,4,maj);
-  sqlite3_bind_int(stmt,5,min);
-  sqlite3_step(stmt);
-  sqlite3_finalize(stmt);
-}
-
-void view_todays_tasks() {
-  clear_screen();
-  std::cout << "-- Today's Tasks --\n";
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db,
-    "SELECT name, type FROM tasks WHERE "
-    "  last_done IS NULL"
-    "  OR (frequency > 0"
-    "      AND date('now','localtime')"
-    "          >= date(last_done, '+' || frequency || ' days')"
-    "     )",
-    -1, &stmt, nullptr);
-
-  while (sqlite3_step(stmt) == SQLITE_ROW) {
-    std::cout << "- " << sqlite3_column_text(stmt,0)
-              << " (" << sqlite3_column_text(stmt,1) << ")\n";
-  }
-  sqlite3_finalize(stmt);
-  std::cin.get();
-}
-
-void complete_task() {
-  clear_screen();
-  std::cout << "-- Complete Task --\n";
-  std::string task_name;
-  std::cout << "Task name: ";
-  std::getline(std::cin, task_name);
-  int task_id = get_task_id_by_name(task_name);
-  if (task_id == -1) {
-    std::cout << "Task not found.\n";
-    std::cin.get();
-    return;
-  }
-
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db,
-    "SELECT type, major_elem, minor_elem, streak FROM tasks WHERE id = ?",
-    -1, &stmt, nullptr);
-  sqlite3_bind_int(stmt, 1, task_id);
-  sqlite3_step(stmt);
-  std::string type = (const char*)sqlite3_column_text(stmt, 0);
-  int maj = sqlite3_column_int(stmt, 1);
-  int min = sqlite3_column_int(stmt, 2);
-  int streak = sqlite3_column_int(stmt, 3);
-  sqlite3_finalize(stmt);
-
-  int maj_xp = 0, min_xp = 0;
-  if (type == "Quick")     { maj_xp = 10;  min_xp = 5;   }
-  else if (type == "Session") { maj_xp = 60;  min_xp = 30;  }
-  else if (type == "Grind")   { maj_xp = 125; min_xp = 75;  }
-
-  maj_xp += 2 * (streak + 1);
-  min_xp += 1 * (streak + 1);
-
-  sqlite3_prepare_v2(db,
-    "UPDATE elements SET xp = xp + ? WHERE id = ?",
-    -1, &stmt, nullptr);
-  sqlite3_bind_int(stmt, 1, maj_xp);
-  sqlite3_bind_int(stmt, 2, maj);
-  sqlite3_step(stmt);
-  sqlite3_finalize(stmt);
-
-  sqlite3_prepare_v2(db,
-    "UPDATE elements SET xp = xp + ? WHERE id = ?",
-    -1, &stmt, nullptr);
-  sqlite3_bind_int(stmt, 1, min_xp);
-  sqlite3_bind_int(stmt, 2, min);
-  sqlite3_step(stmt);
-  sqlite3_finalize(stmt);
-
-  sqlite3_prepare_v2(db,
-    "UPDATE tasks SET last_done = ?, streak = streak + 1 WHERE id = ?",
-    -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, now_str().c_str(), -1, SQLITE_TRANSIENT);
-  sqlite3_bind_int(stmt, 2, task_id);
-  sqlite3_step(stmt);
-  sqlite3_finalize(stmt);
-
-  std::cout << "Task completed!\n";
   std::cin.get();
 }
 
@@ -462,28 +527,25 @@ void view_domain() {
 
   std::cin.get();
 }
-
+// --- Menu ---------------------------------------------------------------
 void menu() {
-  while (true) {
+  while(true) {
     clear_screen();
-    std::cout << "== Main Menu ==\n"
-              << "1. Add Element\n"
-              << "2. Add Task\n"
-              << "3. View Today's Tasks\n"
-              << "4. Complete Task\n"
-              << "5. View Profile Details\n"
-              << "6. View Domain Details\n"
-              << "0. Exit\n"
-              << "> ";
-    int ch;
-    std::cin >> ch;
-    std::cin.ignore();
-    if      (ch == 1) add_element();
-    else if (ch == 2) add_task();
-    else if (ch == 3) view_todays_tasks();
-    else if (ch == 4) complete_task();
-    else if (ch == 5) view_profile();
-    else if (ch == 6) view_domain();
+    cout<<"== Main Menu ==\n"
+        <<"1. Add Task\n"
+        <<"2. Delete Task\n"
+        <<"3. View Today's Tasks\n"
+        <<"4. Complete Task\n"
+        <<"5. View Profile\n"
+        <<"6. View Domain Details\n"
+        <<"0. Exit\n> ";
+    int ch; cin>>ch; cin.ignore();
+    if(ch==1) add_task();
+    else if(ch==2) delete_task();
+    else if(ch==3) view_todays_tasks();
+    else if(ch==4) complete_task();
+    else if(ch==5) view_profile();
+    else if(ch==6) view_domain();
     else break;
   }
 }
@@ -491,7 +553,8 @@ void menu() {
 int main() {
   sqlite3_open("xLog.db", &db);
   init_db();
-  if (count_rows("domains") == 0) prompt_initial_setup();
+  if(get_int("SELECT COUNT(*) FROM domains") == 0) prompt_initial_setup();
+  log_today_xp();
   menu();
   sqlite3_close(db);
   return 0;
