@@ -216,9 +216,7 @@ void add_task() {
   sqlite3_step(stmt); sqlite3_finalize(stmt);
 }
 
-void delete_task() {
-  clear_screen(); cout<<"-- Delete Task --\n";
-  cout<<"Task name: "; string name; getline(cin,name);
+void delete_task(string name) {
   int tid=get_task_id_by_name(name);
   if(tid<0){ cout<<"Not found.\n"; cin.get(); return; }
   sqlite3_stmt* stmt;
@@ -299,20 +297,14 @@ void complete_task_by_id(int tid) {
   sqlite3_step(stmt); sqlite3_finalize(stmt);
 }
 
-void complete_task() {
-  clear_screen(); cout<<"-- Complete Task --\n";
-  cout<<"Task name: "; string name; getline(cin,name);
+void complete_task(string name) {
   int tid=get_task_id_by_name(name);
   if(tid<0){ cout<<"Not found.\n";cin.get();return; }
   complete_task_by_id(tid);
   cout<<"Task completed!\n"; cin.get();
 }
 
-void make_focus() {
-  clear_screen();
-  cout << "-- Make Focus Element --\n";
-  cout << "Element name: ";
-  string elem_name;
+void make_focus(string elem_name) {
   getline(cin, elem_name);
 
   int eid = get_element_id_by_name(elem_name);
@@ -502,8 +494,7 @@ void view_profile() {
 }
 
 // Enhanced domain dashboard
-void view_domain() {
-    clear_screen();
+void view_domain(string choice) {
     // Fetch domains
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(db, "SELECT id,name FROM domains ORDER BY id", -1, &stmt, nullptr);
@@ -514,8 +505,6 @@ void view_domain() {
     sqlite3_finalize(stmt);
 
     // Select domain
-    cout << "\nEnter domain name: ";
-    string choice; getline(cin, choice);
     int did = -1;
     for (auto& d : domains) if (d.second == choice) did = d.first;
     if (did < 0) { cout << "Domain not found.\n"; cin.get(); return; }
@@ -567,11 +556,7 @@ void view_domain() {
 }
 
 // --- Enable Task --------------------------------------------------------
-void enable_task() {
-  clear_screen();
-  cout << "-- Enable Task --\n";
-  cout << "Task name: ";
-  string name; getline(cin, name);
+void enable_task(string name) {
   int tid = get_task_id_by_name(name);
   if (tid < 0) {
     cout << "Task not found.\n";
@@ -589,11 +574,7 @@ void enable_task() {
 }
 
 // --- Disable Task -------------------------------------------------------
-void disable_task() {
-  clear_screen();
-  cout << "-- Disable Task --\n";
-  cout << "Task name: ";
-  string name; getline(cin, name);
+void disable_task(string name) {
   int tid = get_task_id_by_name(name);
   if (tid < 0) {
     cout << "Task not found.\n";
@@ -637,46 +618,73 @@ void view_all_tasks() {
   sqlite3_finalize(stmt);
   cin.get();
 }
-
-// ---  Menu -------------------------------------------------------
-void menu() {
-  while (true) {
-    clear_screen();
-    cout << "== Main Menu ==\n"
-         << "1. Add Task\n"
-         << "2. Delete Task\n"
-         << "3. View Today's Tasks\n"
-         << "4. Complete Task\n"
-         << "5. View Profile\n"
-         << "6. View Domain Details\n"
-         << "7. Make Focus Element\n"
-         << "8. View All Tasks\n"
-         << "9. Enable Task\n"
-         << "10. Disable Task\n"
-         << "0. Exit\n> ";
-    int ch; cin >> ch; cin.ignore();
-    if      (ch == 1)  add_task();
-    else if (ch == 2)  delete_task();
-    else if (ch == 3)  view_todays_tasks();
-    else if (ch == 4)  complete_task();
-    else if (ch == 5)  view_profile();
-    else if (ch == 6)  view_domain();
-    else if (ch == 7)  make_focus();
-    else if (ch == 8)  view_all_tasks();
-    else if (ch == 9)  enable_task();
-    else if (ch == 10) disable_task();
-    else break;
-  }
+static void usage() {
+  std::cout
+    << "Usage: xlog <command> [args]\n"
+    << "Commands:\n"
+    << "  profile            (default if no args)\n"
+    << "  today              Show today's tasks\n"
+    << "  create             Add a new task\n"
+    << "  delete <task_id>   Delete task by ID\n"
+    << "  list               List all tasks\n"
+    << "  enable <task_id>   Enable a task\n"
+    << "  pause  <task_id>   Disable (pause) a task\n"
+    << "  done   <id> [<id>...] Mark tasks done\n"
+    << "  quick|session|grind <dom1> [<dom2>...]  Grant quick XP\n"
+    << "  info   <domain>    Show domain dashboard\n"
+    << "  focus  <domain> <element>  Set focus element\n";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
   sqlite3_open("xLog.db", &db);
   init_db();
-  if(get_int("SELECT COUNT(*) FROM domains") == 0) prompt_initial_setup();
+  if (get_int("SELECT COUNT(*) FROM domains") == 0)
+    prompt_initial_setup();
   log_today_xp();
-  menu();
+
+  if (argc == 1) {
+    view_profile();
+    sqlite3_close(db);
+    return 0;
+  }
+
+  std::string cmd = argv[1];
+  if (cmd == "profile") {
+    view_profile();
+  }
+  else if (cmd == "today") {
+    view_todays_tasks();
+  }
+  else if (cmd == "create") {
+    add_task();
+  }
+  else if (cmd == "delete" && argc == 3) {
+    delete_task(argv[2]);
+  }
+  else if (cmd == "list") {
+    view_all_tasks();
+  }
+  else if (cmd == "enable" && argc == 3) {
+    enable_task(argv[2]);
+  }
+  else if (cmd == "pause" && argc == 3) {
+    disable_task(argv[2]);
+  }
+  else if (cmd == "done" && argc >= 3) {
+    for (int i = 2; i < argc; ++i)
+      complete_task(argv[i]);
+  }
+  else if (cmd == "info" && argc == 3) {
+    view_domain(argv[2]);
+  }
+  else if (cmd == "focus" && argc == 3) {
+    make_focus(argv[2]);
+  }
+  else {
+    usage();
+  }
+
   sqlite3_close(db);
   return 0;
 }
-
 // cmake --build build && ./build/xlog
