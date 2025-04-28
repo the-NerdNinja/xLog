@@ -568,8 +568,79 @@ void view_domain() {
   std::cin.get();
 }
 
-// --- Menu ---------------------------------------------------------------
+// --- Enable Task --------------------------------------------------------
+void enable_task() {
+  clear_screen();
+  cout << "-- Enable Task --\n";
+  cout << "Task name: ";
+  string name; getline(cin, name);
+  int tid = get_task_id_by_name(name);
+  if (tid < 0) {
+    cout << "Task not found.\n";
+  } else {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(db,
+      "UPDATE tasks SET active = 1 WHERE id = ?",
+      -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, tid);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    cout << "Task enabled.\n";
+  }
+  cin.get();
+}
 
+// --- Disable Task -------------------------------------------------------
+void disable_task() {
+  clear_screen();
+  cout << "-- Disable Task --\n";
+  cout << "Task name: ";
+  string name; getline(cin, name);
+  int tid = get_task_id_by_name(name);
+  if (tid < 0) {
+    cout << "Task not found.\n";
+  } else {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(db,
+      "UPDATE tasks SET active = 0 WHERE id = ?",
+      -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, tid);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    cout << "Task disabled.\n";
+  }
+  cin.get();
+}
+
+// --- View All Tasks -----------------------------------------------------
+void view_all_tasks() {
+  clear_screen();
+  cout << "-- All Tasks --\n";
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db,
+    "SELECT name, type, frequency, last_done, streak, active "
+    "FROM tasks ORDER BY id",
+    -1, &stmt, nullptr);
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    string name      = (const char*)sqlite3_column_text(stmt, 0);
+    string type      = (const char*)sqlite3_column_text(stmt, 1);
+    int freq         = sqlite3_column_int(stmt, 2);
+    const char* ld   = (const char*)sqlite3_column_text(stmt, 3);
+    int streak       = sqlite3_column_int(stmt, 4);
+    int active       = sqlite3_column_int(stmt, 5);
+    cout << "- " << name
+         << " [" << type << "]"
+         << " freq=" << freq
+         << " last_done=" << (ld ? ld : "never")
+         << " streak=" << streak
+         << " " << (active ? "ENABLED" : "DISABLED")
+         << "\n";
+  }
+  sqlite3_finalize(stmt);
+  cin.get();
+}
+
+// ---  Menu -------------------------------------------------------
 void menu() {
   while (true) {
     clear_screen();
@@ -581,15 +652,21 @@ void menu() {
          << "5. View Profile\n"
          << "6. View Domain Details\n"
          << "7. Make Focus Element\n"
+         << "8. View All Tasks\n"
+         << "9. Enable Task\n"
+         << "10. Disable Task\n"
          << "0. Exit\n> ";
     int ch; cin >> ch; cin.ignore();
-    if (ch == 1) add_task();
-    else if (ch == 2) delete_task();
-    else if (ch == 3) view_todays_tasks();
-    else if (ch == 4) complete_task();
-    else if (ch == 5) view_profile();
-    else if (ch == 6) view_domain();
-    else if (ch == 7) make_focus();
+    if      (ch == 1)  add_task();
+    else if (ch == 2)  delete_task();
+    else if (ch == 3)  view_todays_tasks();
+    else if (ch == 4)  complete_task();
+    else if (ch == 5)  view_profile();
+    else if (ch == 6)  view_domain();
+    else if (ch == 7)  make_focus();
+    else if (ch == 8)  view_all_tasks();
+    else if (ch == 9)  enable_task();
+    else if (ch == 10) disable_task();
     else break;
   }
 }
