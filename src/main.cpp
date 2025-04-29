@@ -304,9 +304,40 @@ void complete_task(string name) {
   cout<<"Task completed!\n"; cin.get();
 }
 
-void make_focus(string elem_name) {
-  getline(cin, elem_name);
+void grant_base_xp(const std::string& type, string maj_ele, string min_ele) {
+  int maj_id = get_element_id_by_name(maj_ele);
+  int min_id = get_element_id_by_name(min_ele);
 
+  int base_maj = 0, base_min = 0;
+  if      (type == "Quick")   { base_maj = 10;  base_min = 5;  }
+  else if (type == "Session") { base_maj = 60;  base_min = 30; }
+  else if (type == "Grind")   { base_maj = 125; base_min = 75; }
+
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db,
+  "SELECT is_focus FROM elements WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, maj_id);
+  bool focus = (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) == 1);
+  sqlite3_finalize(stmt);
+  if(focus){ base_maj += (base_maj/10); base_min += (base_min/10);}
+
+  // update major element
+  sqlite3_prepare_v2(db,
+    "UPDATE elements SET xp = xp + ? WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, base_maj);
+  sqlite3_bind_int(stmt, 2, maj_id);
+  sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+  // update minor element
+  sqlite3_prepare_v2(db,
+    "UPDATE elements SET xp = xp + ? WHERE id = ?", -1, &stmt, nullptr);
+  sqlite3_bind_int(stmt, 1, base_min);
+  sqlite3_bind_int(stmt, 2, min_id);
+  sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+}
+
+void make_focus(string elem_name) {
   int eid = get_element_id_by_name(elem_name);
   if (eid < 0) {
     cout << "Element not found.\n"; cin.get(); return;
@@ -679,6 +710,9 @@ int main(int argc, char* argv[]) {
   }
   else if (cmd == "focus" && argc == 3) {
     make_focus(argv[2]);
+  }
+  else if ((cmd == "Quick" or cmd == "Session" or cmd == "Grind") and argc==4){
+    grant_base_xp(cmd, argv[2], argv[3]);
   }
   else {
     usage();
