@@ -50,7 +50,7 @@ Embodying the spirit of **solo leveling**, xLog emphasizes that the greatest cha
 Clone the repository and run the installer script:
 
 ```bash
-git clone https://github.com/yourusername/xLog.git
+git clone https://github.com/the-NerdNinja/xLog.git
 cd xLog
 chmod +x install.sh      # if needed
 ./install.sh             # builds, installs binary to /usr/local/bin/xlog, and creates $HOME/xLog

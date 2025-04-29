@@ -340,7 +340,7 @@ int main(int argc, char* argv[]) {
   else if (cmd == "focus" && argc == 3) {
     make_focus(argv[2]);
   }
-  else if ((cmd == "Quick" or cmd == "Session" or cmd == "Grind") and argc==4){
+  else if ((cmd == "quick" or cmd == "session" or cmd == "grind") and argc==4){
     grant_base_xp(cmd, argv[2], argv[3]);
   }
   else {

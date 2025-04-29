@@ -61,7 +61,9 @@ CMakeFiles/xlog.dir/src/main.cpp.o: /mnt/c/Users/IUT_220041109/OneDrive/Desktop/
   /usr/include/bits/stdint-intn.h \
   /usr/include/bits/stdint-least.h \
   /usr/include/bits/stdint-uintn.h \
+  /usr/include/bits/stdio.h \
   /usr/include/bits/stdio_lim.h \
+  /usr/include/bits/stdlib-bsearch.h \
   /usr/include/bits/stdlib-float.h \
   /usr/include/bits/struct_mutex.h \
   /usr/include/bits/struct_rwlock.h \
@@ -668,13 +670,11 @@ xlog: /usr/lib/libc.so \
 
 /usr/include/bits/timesize.h:
 
-/usr/include/c++/14.2.1/bits/shared_ptr_atomic.h:
-
 /usr/include/bits/types/wint_t.h:
 
-/usr/include/c++/14.2.1/bits/basic_ios.h:
-
 /usr/include/bits/sigcontext.h:
+
+/usr/include/c++/14.2.1/bits/basic_ios.h:
 
 /usr/include/c++/14.2.1/bits/deque.tcc:
 
@@ -715,16 +715,6 @@ xlog: /usr/lib/libc.so \
 /usr/include/bits/mathcalls.h:
 
 /usr/include/bits/types/__sigset_t.h:
-
-/usr/include/c++/14.2.1/bits/atomic_lockfree_defines.h:
-
-/usr/include/wctype.h:
-
-/usr/include/sched.h:
-
-/usr/include/bits/fp-fast.h:
-
-/usr/include/c++/14.2.1/bits/stl_tempbuf.h:
 
 /usr/include/c++/14.2.1/pstl/glue_algorithm_defs.h:
 
@@ -771,6 +761,10 @@ xlog: /usr/lib/libc.so \
 /usr/include/bits/time.h:
 
 /usr/include/c++/14.2.1/bits/predefined_ops.h:
+
+/usr/include/c++/14.2.1/bits/shared_ptr_atomic.h:
+
+/usr/include/bits/stdio.h:
 
 /usr/include/bits/errno.h:
 
@@ -980,11 +974,23 @@ xlog: /usr/lib/libc.so \
 
 /usr/include/bits/signal_ext.h:
 
+/usr/include/bits/stdlib-bsearch.h:
+
 /usr/include/c++/14.2.1/bits/basic_ios.tcc:
 
 /usr/include/bits/math-vector.h:
 
 /usr/include/bits/uio_lim.h:
+
+/usr/include/wctype.h:
+
+/usr/include/sched.h:
+
+/usr/include/bits/fp-fast.h:
+
+/usr/include/c++/14.2.1/bits/atomic_lockfree_defines.h:
+
+/usr/include/c++/14.2.1/bits/stl_tempbuf.h:
 
 /usr/include/wchar.h:
 
@@ -1073,6 +1079,12 @@ xlog: /usr/lib/libc.so \
 /usr/include/bits/siginfo-consts.h:
 
 /usr/include/c++/14.2.1/bits/stl_set.h:
+
+/usr/include/setjmp.h:
+
+/usr/include/c++/14.2.1/bits/vector.tcc:
+
+/usr/include/c++/14.2.1/bit:
 
 /usr/include/c++/14.2.1/bits/memoryfwd.h:
 
@@ -1299,9 +1311,3 @@ xlog: /usr/lib/libc.so \
 /usr/include/c++/14.2.1/future:
 
 /usr/include/c++/14.2.1/bits/valarray_array.tcc:
-
-/usr/include/setjmp.h:
-
-/usr/include/c++/14.2.1/bit:
-
-/usr/include/c++/14.2.1/bits/vector.tcc:

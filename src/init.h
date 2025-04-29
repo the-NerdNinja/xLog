@@ -118,7 +118,7 @@ void prompt_initial_setup() {
 
   int did_elem = get_element_id_by_name("Discipline");
   sqlite3_prepare_v2(db,
-    "INSERT INTO tasks(name,type,frequency,major_elem,minor_elem) VALUES('daily_login','Session',1,?,?)",
+    "INSERT INTO tasks(name,type,frequency,major_elem,minor_elem) VALUES('daily_login','quick',1,?,?)",
     -1,&stmt,nullptr);
   sqlite3_bind_int(stmt,1,did_elem);
   sqlite3_bind_int(stmt,2,did_elem);
