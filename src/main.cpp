@@ -656,14 +656,14 @@ static void usage() {
     << "  profile            (default if no args)\n"
     << "  today              Show today's tasks\n"
     << "  create             Add a new task\n"
-    << "  delete <task_id>   Delete task by ID\n"
+    << "  delete <task_name>   Delete task by ID\n"
     << "  list               List all tasks\n"
-    << "  enable <task_id>   Enable a task\n"
-    << "  pause  <task_id>   Disable (pause) a task\n"
-    << "  done   <id> [<id>...] Mark tasks done\n"
-    << "  quick|session|grind <dom1> [<dom2>...]  Grant quick XP\n"
+    << "  enable <task_name>   Enable a task\n"
+    << "  pause  <task_name>   Disable (pause) a task\n"
+    << "  done   <name> [<name>...] Mark tasks done\n"
+    << "  quick|session|grind <ele1> <ele2>  Grant quick XP\n"
     << "  info   <domain>    Show domain dashboard\n"
-    << "  focus  <domain> <element>  Set focus element\n";
+    << "  focus  <domain>    Set focus element\n";
 }
 
 int main(int argc, char* argv[]) {
