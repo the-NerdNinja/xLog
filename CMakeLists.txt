@@ -9,5 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(SQLite3 REQUIRED)
 include_directories(${SQLite3_INCLUDE_DIRS})
 
-add_executable(xlog src/main.cpp)
+add_executable(xlog 
+  src/main.cpp
+)
 target_link_libraries(xlog PRIVATE ${SQLite3_LIBRARIES})

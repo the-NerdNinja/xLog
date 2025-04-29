@@ -48,8 +48,8 @@ CMakeFiles/xlog.dir/src/main.cpp.o: \
  /usr/include/bits/pthreadtypes-arch.h \
  /usr/include/bits/atomic_wide_counter.h /usr/include/bits/struct_mutex.h \
  /usr/include/bits/struct_rwlock.h /usr/include/alloca.h \
- /usr/include/bits/stdlib-float.h /usr/include/c++/14.2.1/bits/std_abs.h \
- /usr/include/c++/14.2.1/cstdint \
+ /usr/include/bits/stdlib-bsearch.h /usr/include/bits/stdlib-float.h \
+ /usr/include/c++/14.2.1/bits/std_abs.h /usr/include/c++/14.2.1/cstdint \
  /usr/lib/gcc/x86_64-pc-linux-gnu/14.2.1/include/stdint.h \
  /usr/include/stdint.h /usr/include/bits/wchar.h \
  /usr/include/bits/stdint-uintn.h /usr/include/bits/stdint-least.h \
@@ -117,11 +117,11 @@ CMakeFiles/xlog.dir/src/main.cpp.o: \
  /usr/include/bits/types/__fpos_t.h /usr/include/bits/types/__fpos64_t.h \
  /usr/include/bits/types/struct_FILE.h \
  /usr/include/bits/types/cookie_io_functions_t.h \
- /usr/include/bits/stdio_lim.h /usr/include/c++/14.2.1/cerrno \
- /usr/include/errno.h /usr/include/bits/errno.h \
- /usr/include/linux/errno.h /usr/include/asm/errno.h \
- /usr/include/asm-generic/errno.h /usr/include/asm-generic/errno-base.h \
- /usr/include/bits/types/error_t.h \
+ /usr/include/bits/stdio_lim.h /usr/include/bits/stdio.h \
+ /usr/include/c++/14.2.1/cerrno /usr/include/errno.h \
+ /usr/include/bits/errno.h /usr/include/linux/errno.h \
+ /usr/include/asm/errno.h /usr/include/asm-generic/errno.h \
+ /usr/include/asm-generic/errno-base.h /usr/include/bits/types/error_t.h \
  /usr/include/c++/14.2.1/bits/charconv.h \
  /usr/include/c++/14.2.1/bits/basic_string.tcc \
  /usr/include/c++/14.2.1/bits/memory_resource.h \
@@ -314,4 +314,7 @@ CMakeFiles/xlog.dir/src/main.cpp.o: \
  /usr/include/c++/14.2.1/bits/fs_path.h \
  /usr/include/c++/14.2.1/bits/fs_dir.h \
  /usr/include/c++/14.2.1/bits/fs_ops.h \
- /usr/include/c++/14.2.1/memory_resource /usr/include/sqlite3.h
+ /usr/include/c++/14.2.1/memory_resource /usr/include/sqlite3.h \
+ /mnt/c/Users/IUT_220041109/OneDrive/Desktop/xLog/src/init.h \
+ /mnt/c/Users/IUT_220041109/OneDrive/Desktop/xLog/src/utils.h \
+ /mnt/c/Users/IUT_220041109/OneDrive/Desktop/xLog/src/dashboard.h

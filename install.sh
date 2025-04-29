@@ -16,3 +16,4 @@ mkdir -p "$DATA"
 
 echo "✓ Installed xlog to ${BINDIR}/xlog"
 echo "✓ Database directory: ${DATA}"
+
